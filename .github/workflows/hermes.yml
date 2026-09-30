@@ -1,0 +1,37 @@
+name: Run Hermes Agent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-hermes:
+    runs-on: ubuntu-latest
+    environment: Secrate
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+         python-version: '3.11'
+
+      - name: Install Hermes
+        run: |
+          pip install --upgrade pip
+          pip install hermes-agent
+
+      - name: Configure and Run Hermes
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          mkdir -p ~/.hermes
+          cat << 'EOF' > ~/.hermes/.env
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          EOF
+
+          # Run Hermes Telegram gateway
+          python -m hermes.gateway --platform telegram
