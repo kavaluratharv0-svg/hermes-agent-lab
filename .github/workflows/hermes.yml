@@ -19,27 +19,27 @@ jobs:
 
       - name: Install Hermes Agent
         run: |
-          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          python -m pip install --upgrade pip
+          pip install hermes-agent
 
-      - name: Configure Hermes (OpenRouter & Model)
+      - name: Configure Hermes (OpenRouter with Free Nemotron 3 Super)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           mkdir -p ~/.hermes
 
-          # 1. Store secrets in .env
+          # 1. Store secrets in environment file
           cat << 'EOF' > ~/.hermes/.env
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           EOF
 
-          # 2. Configure model and provider in config.yaml
+          # 2. Set provider and default model
           cat << 'EOF' > ~/.hermes/config.yaml
           model:
             provider: "openrouter"
-            default: "anthropic/claude-3.5-sonnet"
+            default: "nvidia/nemotron-3-super-120b-a12b:free"
           platforms:
             telegram:
               enabled: true
@@ -50,5 +50,4 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          # Starts the gateway process and keeps the GitHub Action runner active
-          hermes gateway run telegram
+          python -m hermes gateway telegram
