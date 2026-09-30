@@ -1,3 +1,11 @@
+/opt/hostedtoolcache/Python/3.11.16/x64/bin/python: No module named hermes
+```[cite: 8]
+
+The PyPI package installs the executable as `hermes-agent` (or `agent`), not as a Python module called `hermes`[cite: 8]. Additionally, the CLI exposes `hermes-agent gateway telegram`.
+
+Here is the fixed `.github/workflows/hermes.yml`:
+
+```yaml
 name: Run Hermes Agent
 
 on:
@@ -50,4 +58,5 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          python -m hermes gateway telegram
+          # Use the CLI binary installed directly into PATH by pip
+          hermes-agent gateway run telegram
