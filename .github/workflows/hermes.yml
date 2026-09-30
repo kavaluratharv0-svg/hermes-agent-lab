@@ -15,23 +15,40 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-         python-version: '3.11'
+          python-version: '3.11'
 
-      - name: Install Hermes
+      - name: Install Hermes Agent
         run: |
-          pip install --upgrade pip
-          pip install hermes-agent
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Configure and Run Hermes
+      - name: Configure Hermes (OpenRouter & Model)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           mkdir -p ~/.hermes
+
+          # 1. Store secrets in .env
           cat << 'EOF' > ~/.hermes/.env
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           EOF
 
-          # Run Hermes Telegram gateway
-          python -m hermes.gateway --platform telegram
+          # 2. Configure model and provider in config.yaml
+          cat << 'EOF' > ~/.hermes/config.yaml
+          model:
+            provider: "openrouter"
+            default: "anthropic/claude-3.5-sonnet"
+          platforms:
+            telegram:
+              enabled: true
+          EOF
+
+      - name: Run Telegram Gateway
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          # Starts the gateway process and keeps the GitHub Action runner active
+          hermes gateway run telegram
