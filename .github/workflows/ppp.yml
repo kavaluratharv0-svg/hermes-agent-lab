@@ -34,8 +34,9 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
-      - name: Install cargo-ndk (prebuilt)
-        uses: taiki-e/install-action@cargo-ndk
+L
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
 
       - name: Locate Android NDK
         id: ndk
