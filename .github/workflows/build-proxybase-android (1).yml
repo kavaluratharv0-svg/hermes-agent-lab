@@ -1,0 +1,88 @@
+name: Build ProxyBase CLI for Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: "ProxyBase CLI Git repository URL"
+        required: false
+        default: "https://github.com/proxybasehq/proxybase-cli.git"
+      git_ref:
+        description: "Branch, tag, or commit to build"
+        required: false
+        default: "main"
+      abis:
+        description: "Comma-separated Android ABIs (e.g. arm64-v8a or arm64-v8a,armeabi-v7a,x86_64)"
+        required: false
+        default: "arm64-v8a"
+      min_sdk:
+        description: "Android minSdk platform level"
+        required: false
+        default: "24"
+
+jobs:
+  build-android-binary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone proxybase-cli
+        run: |
+          git clone --depth 1 --branch "${{ inputs.git_ref }}" "${{ inputs.repo_url }}" proxybase-cli
+
+      - name: Set up Rust toolchain with Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Locate Android NDK
+        id: ndk
+        run: |
+          NDK_PATH="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}}"
+          if [ -z "$NDK_PATH" ] && [ -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk" ]; then
+            NDK_PATH="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          fi
+          if [ -z "$NDK_PATH" ] || [ ! -d "$NDK_PATH" ]; then
+            echo "Error: Android NDK not found on runner." >&2
+            exit 1
+          fi
+          echo "Using NDK: $NDK_PATH"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+
+      - name: Cross-compile proxybase-cli for Android
+        working-directory: proxybase-cli
+        run: |
+          mkdir -p ../out/jniLibs
+          IFS=',' read -ra ABI_LIST <<< "${{ inputs.abis }}"
+
+          for raw_abi in "${ABI_LIST[@]}"; do
+            ABI="$(echo "$raw_abi" | xargs)"
+            case "$ABI" in
+              arm64-v8a)   TRIPLE="aarch64-linux-android" ;;
+              armeabi-v7a) TRIPLE="armv7-linux-androideabi" ;;
+              x86_64)      TRIPLE="x86_64-linux-android" ;;
+              *)
+                echo "Unsupported ABI: $ABI" >&2
+                exit 1
+                ;;
+            esac
+
+            echo "==> Building proxybase-cli for $ABI ($TRIPLE)..."
+            cargo ndk -t "$ABI" --platform "${{ inputs.min_sdk }}" build --release --bin proxybase-cli
+
+            mkdir -p "../out/jniLibs/$ABI"
+            cp "target/$TRIPLE/release/proxybase-cli" "../out/jniLibs/$ABI/libproxybase_cli.so"
+
+            echo "==> Verifying binary ELF headers for $ABI:"
+            file "../out/jniLibs/$ABI/libproxybase_cli.so"
+            readelf -l "../out/jniLibs/$ABI/libproxybase_cli.so" | grep -E 'Requesting program interpreter' || true
+          done
+
+      - name: Upload Android jniLibs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxybase-android-jniLibs
+          path: out/jniLibs
+          if-no-files-found: error
